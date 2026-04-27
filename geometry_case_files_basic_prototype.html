@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Geometry Case Files</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:Arial, sans-serif;background:#f4efff;color:#34324a;display:flex;justify-content:center;align-items:center;padding:24px}
+.app{width:100%;max-width:900px;background:white;border-radius:24px;padding:24px;box-shadow:0 20px 45px rgba(80,64,130,.15)}
+.top{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:1px solid #e6def7;padding-bottom:12px;margin-bottom:18px}
+.pill{background:#fbf9ff;border:1px solid #e6def7;border-radius:999px;padding:6px 12px;font-size:14px}
+h1{font-size:36px;margin-bottom:6px}
+p{color:#77738c}
+button{border:none;border-radius:12px;padding:10px 14px;background:#b9a7f4;color:white;cursor:pointer}
+button:hover{background:#7d67c8}
+.ghost{background:white;color:#7d67c8;border:1px solid #e6def7}
+.screen{display:none}
+.screen.active{display:block}
+.game-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.question-panel,.answer-panel{background:#fbf9ff;border:1px solid #e6def7;border-radius:18px;padding:16px}
+.diagram-box{background:white;border:1px solid #e6def7;border-radius:14px;min-height:200px;display:flex;align-items:center;justify-content:center;margin-top:10px}
+.diagram-box svg{width:95%;max-height:190px}
+@media(max-width:750px){.game-layout{grid-template-columns:1fr}}
+.choices{display:grid;gap:8px;margin-top:12px}
+.choice{width:100%;text-align:left;background:white;border:1px solid #e6def7;color:#34324a}
+.correct{background:#d9f8e7!important}
+.wrong{background:#ffe0e0!important}
+.shop-grid,.mode-grid,.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.shop-item,.mode-card,.concept-card{background:white;border:1px solid #e6def7;border-radius:14px;padding:12px}
+.preview{height:28px;border-radius:8px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="top">
+  <div class="pill">Geometry Case Files</div>
+  <div class="pill" id="gems">Gems: 0</div>
+  <div class="pill" id="streak">Streak: 0</div>
+  <div class="pill" id="total">Questions: 0</div>
+</div>
+
+<section id="home" class="screen active">
+  <h1>Geometry Case Files</h1>
+  <p>Solve problems, earn gems, and practice by mode.</p>
+  <div class="mode-grid">
+    <div class="mode-card">
+      <h3>Mixed Mode</h3>
+      <button onclick="startMode('mixed')">Play</button>
+    </div>
+    <div class="mode-card">
+      <h3>Hard Mode</h3>
+      <button onclick="startMode('hard')">Play</button>
+    </div>
+    <div class="mode-card">
+      <h3>Concepts</h3>
+      <button class="ghost" onclick="openConcepts()">Open</button>
+    </div>
+  </div>
+</section>
+
+<section id="game" class="screen">
+  <button class="ghost" onclick="goHome()">← Back</button>
+  <div class="game-layout">
+    <div class="question-panel">
+      <h2 id="title"></h2>
+      <p id="question"></p>
+      <div class="diagram-box" id="diagram"></div>
+    </div>
+    <div class="answer-panel">
+      <div class="choices" id="choices"></div>
+      <button onclick="showHint()">Hint</button>
+      <button onclick="showSolution()" id="solutionBtn" disabled>Solution</button>
+      <p id="feedback"></p>
+      <div id="hint"></div>
+      <div id="solution"></div>
+      <button id="next" onclick="nextQ()" disabled>Next</button>
+    </div>
+  </div>
+</section>
+
+<script>
+var gems = 0;
+var streak = 0;
+var total = 0;
+var answered = false;
+var cur = null;
+var currentMode = 'mixed';
+var recentTypes = [];
+
+function R(a,b){ return Math.floor(Math.random() * (b - a + 1)) + a; }
+function pick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+function shuffle(arr){
+  var copy = arr.slice();
+  for(var i = copy.length - 1; i > 0; i--){
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = temp;
+  }
+  return copy;
+}
+function choices(answer, wrongs){
+  var ans = String(answer);
+  var set = {};
+  var list = [];
+  function add(x){
+    x = String(x);
+    if(!set[x]){
+      set[x] = true;
+      list.push(x);
+    }
+  }
+  add(ans);
+  for(var i = 0; i < wrongs.length; i++) add(wrongs[i]);
+  var guard = 0;
+  while(list.length < 5 && guard < 50){
+    var n = Number(answer);
+    if(isFinite(n)) add(n + R(-10,10));
+    else add(ans + ' option ' + guard);
+    guard++;
+  }
+  return shuffle(list).slice(0,5);
+}
+
+function genSimilarity(){
+  var ab = R(4,9);
+  var scale = pick([2,3,4]);
+  var bc = R(5,12);
+  var ans = bc * scale;
+  return {
+    t:'Similarity',
+    q:'AB = ' + ab + ', DE = ' + (ab * scale) + ', and BC = ' + bc + '. Find EF.',
+    a:String(ans),
+    c:choices(ans,[ans + scale, ans - scale, ans + 2, ans + 6]),
+    h:'Find the scale factor first.',
+    e:'Scale factor is ' + scale + '.',
+    s:'DE/AB = ' + (ab * scale) + '/' + ab + ' = ' + scale + ', so EF = ' + bc + ' × ' + scale + ' = ' + ans + '.',
+    d:'similarity',
+    type:'similarity'
+  };
+}
+function genCircle(){
+  var a = pick([4,5,6,8]);
+  var b = pick([12,15,18,20]);
+  var c = pick([6,8,9,10]);
+  var prod = a * b;
+  while(prod % c !== 0){ c = pick([6,8,9,10]); }
+  var ans = prod / c;
+  return {
+    t:'Circle',
+    q:'Two chords intersect. One chord has pieces ' + a + ' and ' + b + '. The other has pieces ' + c + ' and x. Find x.',
+    a:String(ans),
+    c:choices(ans,[ans + 2, ans - 2, ans + 4, ans + 6]),
+    h:'Use intersecting chords: product equals product.',
+    e:a + ' × ' + b + ' = ' + c + 'x.',
+    s:a + ' × ' + b + ' = ' + prod + ', so ' + c + 'x = ' + prod + ' and x = ' + ans + '.',
+    d:'circle',
+    type:'circle'
+  };
+}
+function genRight(){
+  var triples = [[3,4,5],[5,12,13],[8,15,17]];
+  var tr = pick(triples);
+  var k = pick([2,3,4]);
+  var a = tr[0] * k;
+  var b = tr[1] * k;
+  var ans = tr[2] * k;
+  return {
+    t:'Right Triangle',
+    q:'A right triangle has legs ' + a + ' and ' + b + '. Find the hypotenuse.',
+    a:String(ans),
+    c:choices(ans,[ans - 2, ans + 2, ans + 4, ans + 6]),
+    h:'Look for a scaled Pythagorean triple.',
+    e:'This is ' + tr[0] + '-' + tr[1] + '-' + tr[2] + ' scaled by ' + k + '.',
+    s:'Hypotenuse = ' + tr[2] + ' × ' + k + ' = ' + ans + '.',
+    d:'right',
+    type:'right'
+  };
+}
+function genArea(){
+  var area = pick([24,30,36,48,60,72]);
+  var ans = area / 2;
+  return {
+    t:'Area Geometry',
+    q:'A median divides a triangle of area ' + area + ' into two smaller triangles. Find the area of one smaller triangle.',
+    a:String(ans),
+    c:choices(ans,[ans + 4, ans - 4, area, area / 3]),
+    h:'A median splits a triangle into equal areas.',
+    e:'The two smaller triangles have equal area.',
+    s:area + ' ÷ 2 = ' + ans + '.',
+    d:'similarity',
+    type:'area'
+  };
+}
+function genCoordinate(){
+  var dx = pick([3,5,6,8,9]);
+  var dy = pick([4,6,8,12]);
+  var ans = dx * dx + dy * dy;
+  return {
+    t:'Coordinate Geometry',
+    q:'Two points differ by ' + dx + ' horizontally and ' + dy + ' vertically. Find the square of the distance between them.',
+    a:String(ans),
+    c:choices(ans,[ans + 10, ans - 10, ans + 20, ans - 20]),
+    h:'Use distance squared: dx² + dy².',
+    e:'Distance squared is ' + dx + '² + ' + dy + '².',
+    s:dx + '² + ' + dy + '² = ' + (dx*dx) + ' + ' + (dy*dy) + ' = ' + ans + '.',
+    d:'right',
+    type:'coordinate'
+  };
+}
+function genAngles(){
+  var x = pick([25,30,35,40]);
+  var ext = 2 * x + 15;
+  return {
+    t:'Angle Chasing',
+    q:'A triangle has remote interior angles x and x + 15. The exterior angle is ' + ext + '°. Find x.',
+    a:String(x),
+    c:choices(x,[x + 5, x - 5, x + 10, x + 15]),
+    h:'Exterior angle equals the sum of the two remote interior angles.',
+    e:'x + (x + 15) = ' + ext + '.',
+    s:'2x + 15 = ' + ext + ', so 2x = ' + (ext - 15) + ' and x = ' + x + '.',
+    d:'similarity',
+    type:'angles'
+  };
+}
+function genHard(){
+  var options = [
+    function(){
+      return {t:'Ceva Product',q:'In triangle ABC, BD/DC = 2/3 and CE/EA = 5/4. Find AF/FB so the cevians are concurrent.',a:'6/5',c:['6/5','5/6','3/2','8/15','15/8'],h:'Use Ceva.',e:'The product of the three ratios is 1.',s:'(2/3)(5/4)(AF/FB)=1, so (5/6)(AF/FB)=1 and AF/FB=6/5.',d:'similarity',type:'ceva'};
+    },
+    function(){
+      return {t:'Power of a Point',q:'From P, tangent PT and secant PAB are drawn. PA = 4 and AB = 21. Find PT.',a:'10',c:['8','9','10','12','14'],h:'Tangent² = external × whole secant.',e:'PB = 25, so PT² = 4 × 25.',s:'PT² = 100, so PT = 10.',d:'circle',type:'power'};
+    }
+  ];
+  return pick(options)();
+}
+function makeQuestion(){
+  var pool;
+  if(currentMode === 'hard') pool = [genHard, genCircle, genRight];
+  else if(currentMode === 'similarity') pool = [genSimilarity, genArea];
+  else if(currentMode === 'circle') pool = [genCircle, genHard];
+  else if(currentMode === 'right') pool = [genRight, genCoordinate];
+  else if(currentMode === 'coordinate') pool = [genCoordinate];
+  else if(currentMode === 'area') pool = [genArea];
+  else if(currentMode === 'angles') pool = [genAngles];
+  else pool = [genSimilarity, genCircle, genRight, genArea, genCoordinate, genAngles];
+
+  for(var i = 0; i < 10; i++){
+    var q = pick(pool)();
+    if(recentTypes.indexOf(q.type) === -1){
+      recentTypes.push(q.type);
+      if(recentTypes.length > 3) recentTypes.shift();
+      return q;
+    }
+  }
+  var fallback = pick(pool)();
+  recentTypes.push(fallback.type);
+  if(recentTypes.length > 3) recentTypes.shift();
+  return fallback;
+}
+
+function show(id){
+  var screens = document.querySelectorAll('.screen');
+  for(var i = 0; i < screens.length; i++) screens[i].classList.remove('active');
+  document.getElementById(id).classList.add('active');
+}
+function startMode(m){ currentMode = m; show('game'); nextQ(); }
+function openConcepts(){ alert('Concepts in full version'); }
+function goHome(){ show('home'); }
+
+function nextQ(){
+  answered = false;
+  document.getElementById('feedback').innerHTML = '';
+  document.getElementById('hint').innerHTML = '';
+  document.getElementById('solution').innerHTML = '';
+  document.getElementById('next').disabled = true;
+  document.getElementById('solutionBtn').disabled = true;
+
+  cur = makeQuestion();
+  document.getElementById('title').textContent = cur.t;
+  document.getElementById('question').textContent = cur.q;
+  document.getElementById('diagram').innerHTML = makeDiagram(cur.d);
+
+  var box = document.getElementById('choices');
+  box.innerHTML = '';
+  for(var i = 0; i < cur.c.length; i++){
+    var b = document.createElement('button');
+    b.className = 'choice';
+    b.textContent = cur.c[i];
+    b.setAttribute('data-answer', cur.c[i]);
+    b.onclick = function(){ check(this, this.getAttribute('data-answer')); };
+    box.appendChild(b);
+  }
+}
+function check(btn,x){
+  if(answered) return;
+  answered = true;
+  var buttons = document.querySelectorAll('.choice');
+  for(var i = 0; i < buttons.length; i++){
+    buttons[i].disabled = true;
+    if(buttons[i].textContent === cur.a) buttons[i].classList.add('correct');
+  }
+  total += 1;
+  if(String(x) === String(cur.a)){
+    gems += 3;
+    streak += 1;
+    btn.classList.add('correct');
+    document.getElementById('feedback').innerHTML = 'Correct — ' + cur.e;
+  }else{
+    streak = 0;
+    btn.classList.add('wrong');
+    document.getElementById('feedback').innerHTML = 'Wrong — ' + cur.e;
+  }
+  document.getElementById('gems').textContent = 'Gems: ' + gems;
+  document.getElementById('streak').textContent = 'Streak: ' + streak;
+  document.getElementById('total').textContent = 'Questions: ' + total;
+  document.getElementById('next').disabled = false;
+  document.getElementById('solutionBtn').disabled = false;
+}
+function makeDiagram(type){
+  if(type === 'circle'){
+    return '<svg viewBox="0 0 300 200"><circle cx="150" cy="100" r="70" fill="none" stroke="#333" stroke-width="3"/><line x1="80" y1="100" x2="220" y2="100" stroke="#888" stroke-width="3"/><line x1="150" y1="40" x2="150" y2="160" stroke="#888" stroke-width="3"/><text x="148" y="102" font-size="16">x</text></svg>';
+  }
+  if(type === 'right'){
+    return '<svg viewBox="0 0 300 200"><polygon points="80,150 80,60 220,150" fill="none" stroke="#333" stroke-width="3"/><rect x="80" y="130" width="20" height="20" fill="none" stroke="#333"/><text x="150" y="105" font-size="16">?</text></svg>';
+  }
+  return '<svg viewBox="0 0 300 200"><polygon points="80,150 150,60 220,150" fill="none" stroke="#333" stroke-width="3"/><polygon points="100,150 150,90 200,150" fill="none" stroke="#888" stroke-width="3"/><text x="150" y="55" text-anchor="middle" font-size="14">△</text></svg>';
+}
+function showHint(){ if(cur) document.getElementById('hint').innerHTML = 'Hint: ' + cur.h; }
+function showSolution(){ if(cur) document.getElementById('solution').innerHTML = 'Solution: ' + cur.s; }
+</script>
+</body>
+</html>
